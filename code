@@ -1,0 +1,170 @@
+#include <ArduinoMqttClient.h>
+#include <WiFiNINA.h>
+
+///////please enter your sensitive data in the Secret tab/arduino_secrets.h
+char ssid[] = SECRET_SSID;    // your network SSID (name)
+char pass[] = SECRET_PASS;    // your network password (use for WPA, or use as key for WEP)
+
+// To connect with SSL/TLS:
+// 1) Change WiFiClient to WiFiSSLClient.
+// 2) Change port value from 1883 to 8883.
+// 3) Change broker value to a server with a known SSL/TLS root certificate 
+//    flashed in the WiFi module.
+
+WiFiClient wifiClient;
+MqttClient mqttClient(wifiClient);
+
+const char broker[]    = "broker.mqttdashboard.com";
+int        port        = 1883;
+const char willTopic[] = "arduino/will";
+const char inTopic[]   = "SIT210/inwave";
+const char outTopic[]  = "SIT210/outwave";
+
+const long interval = 10000;
+unsigned long previousMillis = 0;
+
+int count = 1;
+int n = 1;
+
+const int trigPin = 3;
+const int echoPin = 2;
+
+long duration;
+int distance;
+
+void setup() {
+  //Initialize serial and wait for port to open:
+  Serial.begin(9600);
+   pinMode(trigPin, OUTPUT); 
+  pinMode(echoPin, INPUT); 
+  pinMode(6, OUTPUT);
+  while (!Serial) {
+    ; // wait for serial port to connect. Needed for native USB port only
+  }
+
+  // attempt to connect to WiFi network:
+  Serial.print("Attempting to connect to WPA SSID: ");
+  Serial.println(ssid);
+  while (WiFi.begin(ssid, pass) != WL_CONNECTED) {
+    // failed, retry
+    Serial.print(".");
+    delay(5000);
+  }
+
+  Serial.println("You're connected to the network");
+  Serial.println();
+
+
+  String willPayload = "oh no!";
+  bool willRetain = true;
+  int willQos = 1;
+
+  mqttClient.beginWill(willTopic, willPayload.length(), willRetain, willQos);
+  mqttClient.print(willPayload);
+  mqttClient.endWill();
+
+  Serial.print("Attempting to connect to the MQTT broker: ");
+  Serial.println(broker);
+
+  if (!mqttClient.connect(broker, port)) {
+    Serial.print("MQTT connection failed! Error code = ");
+    Serial.println(mqttClient.connectError());
+
+    while (1);
+  }
+
+  Serial.println("You're connected to the MQTT broker!");
+  Serial.println();
+
+  // set the message receive callback
+  mqttClient.onMessage(onMqttMessage);
+
+  Serial.print("Subscribing to topic: ");
+  Serial.println(inTopic);
+  Serial.println();
+
+  // subscribe to a topic
+  // the second parameter sets the QoS of the subscription,
+  // the the library supports subscribing at QoS 0, 1, or 2
+  int subscribeQos = 1;
+
+  mqttClient.subscribe(inTopic, subscribeQos);
+
+  // topics can be unsubscribed using:
+  // mqttClient.unsubscribe(inTopic);
+
+  Serial.print("Waiting for messages on topic: ");
+  Serial.println(inTopic);
+  Serial.println();
+}
+
+void loop() {
+ 
+  mqttClient.poll();
+  
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+ 
+  duration = pulseIn(echoPin, HIGH);
+  distance = duration * 0.0340 / 2;
+
+  Serial.print("Distance: ");
+  Serial.print(distance);
+  Serial.println(" cm");
+  
+  String message = "Harshdeep";
+
+  
+  if(distance <= 10 && distance != 0)
+  {
+    message = message +" waved hand: "+ count;
+     Serial.print("Sending message to topic: ");
+     Serial.println(outTopic);
+     Serial.println(message);
+     
+     bool retained = false;
+     int qos = 1;
+     bool dup = false;
+     
+     mqttClient.beginMessage(outTopic, message.length(), retained, qos, dup);
+     mqttClient.print(message);
+     mqttClient.endMessage();
+     
+     count++;
+  }
+  
+}
+
+void onMqttMessage(int messageSize) {
+  // we received a message, print out the topic and contents
+  Serial.print("Received a message with topic: ");
+  Serial.println(mqttClient.messageTopic());
+
+  // use the Stream interface to print the contents
+  while (mqttClient.available()) 
+  {
+    Serial.print((char)mqttClient.read());
+    n = 0;
+  }
+  
+  Serial.println();
+
+  Serial.println();
+  
+  if(n == 0)
+  {
+    for(int i = 1; i <= 3; i++)
+    {
+      digitalWrite(6, HIGH);
+      delay(200);
+      digitalWrite(6, LOW);
+      delay(200);
+    }
+    
+     n = 1;
+  }
+
+}
