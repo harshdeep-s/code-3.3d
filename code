@@ -16,12 +16,10 @@ MqttClient mqttClient(wifiClient);
 
 const char broker[]    = "broker.mqttdashboard.com";
 int        port        = 1883;
-const char willTopic[] = "arduino/will";
 const char inTopic[]   = "SIT210/inwave";
 const char outTopic[]  = "SIT210/outwave";
 
-const long interval = 10000;
-unsigned long previousMillis = 0;
+
 
 int count = 1;
 int n = 1;
@@ -53,15 +51,6 @@ void setup() {
 
   Serial.println("You're connected to the network");
   Serial.println();
-
-
-  String willPayload = "oh no!";
-  bool willRetain = true;
-  int willQos = 1;
-
-  mqttClient.beginWill(willTopic, willPayload.length(), willRetain, willQos);
-  mqttClient.print(willPayload);
-  mqttClient.endWill();
 
   Serial.print("Attempting to connect to the MQTT broker: ");
   Serial.println(broker);
